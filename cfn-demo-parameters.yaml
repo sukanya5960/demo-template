@@ -1,0 +1,125 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'CloudFormation - demo parameters'
+
+Resources:
+  BuildEnvironment:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of Environment
+      Name: '/build/environment/demo'
+      Type: String
+      Value: demo
+
+  ClientName:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of Client
+      Name: '/demo/client'
+      Type: String
+      Value: test
+
+  VPCCIDR:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: VPC CIDR Block
+      Name: '/demo/vpc/CidrBlock'
+      Type: String
+      Value: 10.10.0.0/16
+
+  AvailabilityZone1:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of AvailabiltyZone1
+      Name: '/demo/AvailabiltyZone1'
+      Type: String
+      Value: us-east-1a
+  AvailabilityZone2:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description:  Name of AvailabiltyZone1
+      Name: '/demo/AvailabiltyZone2'
+      Type: String
+      Value: us-east-1b
+
+  Publicsubnet1cidr:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of demo Public Subnet1
+      Name: '/demo/subnet/publicsubnet1cidr'
+      Type: String
+      Value: 10.10.10.0/24
+  Publicsubnet2cidr:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of demo Public Subnet2
+      Name: '/demo/subnet/publicsubnet2cidr'
+      Type: String
+      Value: 10.10.15.0/24
+
+  Privatesubnet1cidr:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of demo Private Subnet1
+      Name: '/demo/subnet/privatesubnet1cidr'
+      Type: String
+      Value: 10.10.30.0/24
+  Privatesubnet2cidr:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of demo Private Subnet2
+      Name: '/demo/subnet/privatesubnet2cidr'
+      Type: String
+      Value: 10.10.35.0/24
+  Privatesubnet3cidr:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of demo Private Subnet3
+      Name: '/demo/subnet/privatesubnet3cidr'
+      Type: String
+      Value: 10.10.40.0/24
+  Privatesubnet4cidr:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of demo Private Subnet4
+      Name: '/demo/subnet/privatesubnet4cidr'
+      Type: String
+      Value: 10.10.45.0/24
+
+  Instancetype:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of demo Instancetype
+      Name: '/demo/instancetype'
+      Type: String
+      Value: 't2.micro'
+  VolumeSize:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of parameter to define the volumesize
+      Name: '/demo/volumesize'
+      Type: String
+      Value: '8'
+  RDStype:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of demo RDS Instancetype
+      Name: '/demo/rdstype'
+      Type: String
+      Value: 'db.t3.micro'
+
+  KeyPairName:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of parameter to define the demo Keypair
+      Name: '/demo/KeyPairName'
+      Type: String
+      Value: 'key-demo-east-1.pub'
+
+  demoAMI:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: Name of parameter to define the demo AMI
+      Name: '/demo/AMI'
+      Type: String
+      Value: 'ami-0b9e8751a076c5b8f'

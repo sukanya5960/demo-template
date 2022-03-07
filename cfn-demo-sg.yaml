@@ -1,0 +1,120 @@
+---
+    AWSTemplateFormatVersion: '2010-09-09'
+    Description: "Demo CloudFormation- demo Security Group"
+    Parameters:
+      Environment:
+        Description: demo Environment
+        Type: 'AWS::SSM::Parameter::Value<String>'
+        Default: '/build/environment/demo'
+      Client:
+        Description: Client Name
+        Type: 'AWS::SSM::Parameter::Value<String>'
+        Default: '/demo/client'  
+
+
+    Resources:
+      sgrpbastionssh:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+          GroupName: !Sub 'sgrp-${Environment}-${Client}-ssh'
+          GroupDescription: Security Group for SSH access to Demo environment
+          VpcId: 
+              Fn::ImportValue:
+               !Sub 'vpc-${Environment}-${Client}-${AWS::Region}-VPCId'
+          SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '22'
+            ToPort: '22'
+            CidrIp: 10.10.10.0/24
+          - IpProtocol: tcp
+            FromPort: '22'
+            ToPort: '22'
+            CidrIp: 10.10.15.0/24         
+          Tags:
+            - Key: Name
+              Value: !Sub 'sgrp-${Environment}-${Client}-ssh'
+
+      sgrppubtoelb:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+          GroupName: !Sub 'sgrp-${Environment}-${Client}-elb'
+          GroupDescription: Security Group for demo ELB access
+          VpcId: 
+              Fn::ImportValue:
+               !Sub 'vpc-${Environment}-${Client}-${AWS::Region}-VPCId'
+          SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '80'
+            ToPort: '80'
+            CidrIp: 0.0.0.0/0
+          - IpProtocol: tcp
+            FromPort: '443'
+            ToPort: '443'
+            CidrIp: 0.0.0.0/0
+          Tags:
+            - Key: Name
+              Value: !Sub 'sgrp-${Environment}-${Client}-elb'
+
+      sgrpelbtoweb:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+          GroupName: !Sub 'sgrp-${Environment}-${Client}-web'
+          GroupDescription: Security Group for demo web access
+          VpcId: 
+              Fn::ImportValue:
+               !Sub 'vpc-${Environment}-${Client}-${AWS::Region}-VPCId'
+          SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '80'
+            ToPort: '80'
+            CidrIp: 10.10.10.0/24
+          - IpProtocol: tcp
+            FromPort: '443'
+            ToPort: '443'
+            CidrIp: 10.10.15.0/24
+          Tags:
+            - Key: Name
+              Value: !Sub 'sgrp-${Environment}-${Client}-web'
+
+      sgrptords:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+          GroupName: !Sub 'sgrp-${Environment}-${Client}-mysql'
+          GroupDescription: Security Group for RDS access
+          VpcId: 
+              Fn::ImportValue:
+               !Sub 'vpc-${Environment}-${Client}-${AWS::Region}-VPCId'
+          SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '3306'
+            ToPort: '3306'
+            CidrIp: 10.10.15.0/24
+          - IpProtocol: tcp
+            FromPort: '3306'
+            ToPort: '3306'
+            CidrIp: 10.10.10.0/24
+          - IpProtocol: tcp
+            FromPort: '3306'
+            ToPort: '3306'
+            CidrIp: 10.30.0.0/16            
+          Tags:
+            - Key: Name
+              Value: !Sub 'sgrp-${Environment}-${Client}-mysql'
+
+    Outputs:
+      sgrpbastionssh:
+        Value: !Ref sgrpbastionssh
+        Export:
+          Name: !Sub 'sgrp-${Environment}-${Client}-ssh'
+      sgrppubtoelb:
+        Value: !Ref sgrppubtoelb
+        Export:
+          Name: !Sub 'sgrp-${Environment}-${Client}-elb'          
+      sgrpelbtoweb:
+        Value: !Ref sgrpelbtoweb
+        Export:
+          Name: !Sub 'sgrp-${Environment}-${Client}-web' 
+      sgrptords:
+        Value: !Ref sgrptords
+        Export:
+          Name: !Sub 'sgrp-${Environment}-${Client}-mysql'                 

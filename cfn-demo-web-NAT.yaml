@@ -1,0 +1,244 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Demo CloudFormation - demo - Web Stack '
+
+Parameters:
+  Environment:
+    Description: demo Environment
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/build/environment/demo'
+  Client:
+    Description: Client Name
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/client'
+  AvailabilityZone1:
+    Description: Set Availability Zone 1
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/AvailabiltyZone1'
+  AvailabilityZone2:
+    Description: Set Availability Zone 2
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/AvailabiltyZone2'
+
+  KeyPairName:
+    Description: Key file used to SSH into servers
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/KeyPairName'
+
+  InstanceType:
+    Description: 'Name of Parameter to define the instance type.'
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/instancetype'  
+  VolumeSize:  
+    Description: 'Name of Parameter to define the volumesize.'
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/volumesize' 
+  WebAMI:  
+    Description: 'Name of Parameter to define the AMI.'
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/AMI'
+
+#----------------------------------------------------------------------------
+Resources:
+  WaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+#----------------------------------------------------------------------------
+  elbendpoint:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub 'elb-${Environment}'
+      Scheme: internet-facing
+      Subnets:
+        - Fn::ImportValue:
+            Fn::Sub: 'subnet-${Environment}-${Client}-elb-public-${AWS::Region}-az1' 
+        - Fn::ImportValue:
+            Fn::Sub: 'subnet-${Environment}-${Client}-elb-public-${AWS::Region}-az2'        
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds
+        Value: '300'
+      SecurityGroups:
+        - Fn::ImportValue:
+            Fn::Sub: 'sgrp-${Environment}-${Client}-elb'
+      Tags:
+      - Key: Environment
+        Value: demo
+      - Key: Name
+        Value: !Sub 'elb-${Environment}'
+
+  elbtargetgroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 5
+      HealthCheckPath: "/"
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 2
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: '200-399'
+      Name: !Sub 'targetgroup-${Environment}'
+      Port: 80
+      Protocol: HTTP
+#      Targets:
+#      - Id: !Ref "Ec2Instance1"
+#      - Id: !Ref "Ec2Instance2"       
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '20'
+      - Key: stickiness.enabled
+        Value: 'true'
+      - Key: stickiness.type
+        Value: 'lb_cookie'
+      - Key: stickiness.lb_cookie.duration_seconds
+        Value: '86400'
+      UnhealthyThresholdCount: 3
+            
+      VpcId: 
+        Fn::ImportValue:
+          !Sub 'vpc-${Environment}-${Client}-${AWS::Region}-VPCId'
+      Tags:
+      - Key: Environment
+        Value: demo
+      - Key: Name
+        Value: !Sub 'targetgroup-${Environment}'
+
+  # Listner443:
+  #   Type: AWS::ElasticLoadBalancingV2::Listener
+  #   Properties:
+  #     Certificates:
+  #     - CertificateArn: !Ref SSLCertificatearn
+  #     DefaultActions:
+  #     - Type: forward
+  #       TargetGroupArn:
+  #         Ref: elbtargetgroup
+  #     LoadBalancerArn:
+  #       Ref: elbendpoint
+  #     Port: '443'
+  #     Protocol: HTTPS
+  #     SslPolicy: ELBSecurityPolicy-TLS-1-2-Ext-2018-06
+
+  Listner80:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: elbtargetgroup
+      LoadBalancerArn:
+        Ref: elbendpoint
+      Port: '80'
+      Protocol: HTTP
+
+  demowebautoscalinggroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AvailabilityZones:
+      - Ref: AvailabilityZone1
+      - Ref: AvailabilityZone2
+      VPCZoneIdentifier:
+        - Fn::ImportValue:
+            Fn::Sub: 'subnet-${Environment}-${Client}-web-private-${AWS::Region}-az1' 
+        - Fn::ImportValue:
+            Fn::Sub: 'subnet-${Environment}-${Client}-web-private-${AWS::Region}-az2'      
+      LaunchConfigurationName:
+        Ref: demoweblaunchconfig
+      MinSize: '2'
+      MaxSize: '2'
+      DesiredCapacity: '2'
+      TargetGroupARNs:
+      - Ref: elbtargetgroup
+      Tags:
+      - Key: Name
+        Value:  !Sub 'webserver-${Environment}-${Client}'
+        PropagateAtLaunch: 'true'
+      - Key: Environment
+        Value: demo
+        PropagateAtLaunch: 'true'
+      - Key: Role
+        Value: !Sub 'asg-${Environment}-${Client}'
+        PropagateAtLaunch: 'false'
+  demoweblaunchconfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: 'false'
+      KeyName: !Ref KeyPairName
+      ImageId: !Ref WebAMI
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Sub 'iam-${Client}-web-profile'
+      BlockDeviceMappings:
+        -
+          DeviceName: "/dev/xvda"
+          Ebs:
+            VolumeType: "gp2"
+            DeleteOnTermination: "true"
+            VolumeSize: !Ref VolumeSize
+            Encrypted: "true"      
+      SecurityGroups:
+        - Fn::ImportValue:
+            Fn::Sub: 'sgrp-${Environment}-${Client}-ssh'
+        - Fn::ImportValue:
+            Fn::Sub: 'sgrp-${Environment}-${Client}-web'
+        - Fn::ImportValue:
+            Fn::Sub: 'sgrp-${Environment}-${Client}-mysql'                              
+
+  demowebscaleuppolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName:
+        Ref: demowebautoscalinggroup
+      Cooldown: '50'
+      ScalingAdjustment: '1'
+
+  demowebscaledownpolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName:
+        Ref: demowebautoscalinggroup
+      Cooldown: '50'
+      ScalingAdjustment: "-1"
+
+  demowebcpualarmhigh:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Scale-up if CPU > 60% for 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: '120'
+      EvaluationPeriods: '2'
+      Threshold: '60'
+      AlarmActions:
+      - Ref: demowebscaleuppolicy
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value:
+          Ref: demowebautoscalinggroup
+      ComparisonOperator: GreaterThanThreshold
+
+  demowebcpualarmlow:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Scale-down if CPU  50% for 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: '120'
+      EvaluationPeriods: '5'
+      Threshold: '50'
+      AlarmActions:
+      - Ref: demowebscaledownpolicy
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value:
+          Ref: demowebautoscalinggroup
+      ComparisonOperator: LessThanThreshold
+
+Outputs:
+  demowebautoscalinggroup:
+    Value: !Ref demowebautoscalinggroup
+    Export:
+      Name: !Sub 'asg-${Environment}-${Client}'
+
+
+

@@ -1,0 +1,179 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Demo CloudFormation - demo - RDS Stack '
+
+Parameters:
+  Environment:
+    Description: demo Environment
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/build/environment/demo'
+  Client:
+    Description: Client Name
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/client'
+  AvailabiltyZone1:
+    Description: Set Availability Zone 1
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/AvailabiltyZone1'
+  AvailabiltyZone2:
+    Description: Set Availability Zone 2
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/AvailabiltyZone2'
+  
+  DBClass:
+    Description: 'Name of Parameter to define the instance type.'
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: '/demo/rdstype' 
+
+  DBEngine:
+    Default: MariaDB
+    Description: The RDS database engine
+    Type: String
+    AllowedValues:
+    - mysql
+    - MariaDB
+  DBName:
+    Default: demo
+    Description: The RDS database name
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+  DBMasterUser:
+    Default: root
+    NoEcho: 'true'
+    Description: The RDS admin username
+    Type: String
+    MinLength: '1'
+    MaxLength: '16'
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+  DBMasterUserPassword:
+    NoEcho: 'true'
+    Description: The RDS admin password
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: "[a-zA-Z0-9]*"
+    ConstraintDescription: must contain only alphanumeric characters.
+  DBMultiAZ:
+    Default: 'false'
+    Description: Multi AZ database
+    Type: String
+    AllowedValues:
+    - 'true'
+    - 'false'
+  DBStorage:
+    Default: '50'
+    Description: The size of the database (Gb)
+    Type: Number
+    MinValue: '50'
+    MaxValue: '1000'
+    ConstraintDescription: must be between 50 and 1000
+  IopsEnabled:
+    Default: 'false'
+    Description: Iops enabled
+    Type: String
+    AllowedValues:
+    - 'true'
+    - 'false'
+  NumIops:
+    Default: '1000'
+    Description: Number of iops if enabled (10x storage).
+    Type: Number
+    MinValue: '1000'
+  DBStorageEncrypted:
+    Default: 'true'
+    Description: EnableEncryption
+    Type: String
+    AllowedValues:
+    - 'true'
+    - 'false'
+
+Conditions:
+  IsMariaDB:
+    Fn::Equals:
+    - Ref: DBEngine
+    - MariaDB
+  HasIops:
+    Fn::Equals:
+    - Ref: IopsEnabled
+    - 'false'
+Mappings:
+  DBEngine:
+    mariadb:
+      Port: '3306'
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: demo RDS subnet group
+      SubnetIds:
+        - Fn::ImportValue:
+            Fn::Sub: 'subnet-${Environment}-${Client}-rds-private-${AWS::Region}-az1'
+        - Fn::ImportValue:
+            Fn::Sub: 'subnet-${Environment}-${Client}-rds-private-${AWS::Region}-az2'
+
+  DBParameterGroupName:
+        Type: AWS::RDS::DBParameterGroup
+        Properties:
+           Family: mariadb10.4
+           Description: demo RDS parameter group
+           Tags:
+             - Key: Name
+               Value: !Sub 'rds-parametergroup-${Environment}-${Client}'
+
+  DBInstance:
+    DeletionPolicy: Snapshot
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub 'rds-${Environment}-${Client}'
+      DBName:
+        Ref: DBName
+      Engine:
+        Ref: DBEngine
+      StorageType: "gp2"
+      StorageEncrypted: true
+      BackupRetentionPeriod: '31'
+      PreferredBackupWindow: 09:00-10:00
+      PreferredMaintenanceWindow: sun:10:00-sun:12:00
+      MultiAZ:
+        Ref: DBMultiAZ
+      MasterUsername:
+        Ref: DBMasterUser
+      DBInstanceClass:
+        Ref: DBClass
+      AllocatedStorage: 50
+      MasterUserPassword:
+        Ref: DBMasterUserPassword
+      DBSubnetGroupName:
+        Ref: DBSubnetGroup
+      VPCSecurityGroups:
+        - Fn::ImportValue:
+            Fn::Sub: 'sgrp-${Environment}-${Client}-mysql'
+      DBParameterGroupName:
+        Ref: DBParameterGroupName
+      Tags:
+      - Key: Name
+        Value: !Sub 'rds-${Environment}-${Client}'
+      - Key: Environment
+        Value: demo
+
+Outputs:
+  DBName:
+    Value:
+      Ref: DBName
+    Description: DB name
+  DBEndpointAddress:
+    Value:
+      Fn::GetAtt:
+      - DBInstance
+      - Endpoint.Address
+    Description: DB endpoint address
+  DBEndpointPort:
+    Value:
+      Fn::GetAtt:
+      - DBInstance
+      - Endpoint.Port
+    Description: DB endpoint port
