@@ -122,4 +122,4 @@ Resources:
       Description: Name of parameter to define the demo AMI
       Name: '/demo/AMI'
       Type: String
-      Value: 'ami-0b9e8751a076c5b8f'
+      Value: 'ami-06d46cce60b2741c6'
